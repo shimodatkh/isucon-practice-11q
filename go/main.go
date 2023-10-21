@@ -257,10 +257,10 @@ func main() {
 		return
 	}
 
+	go insertIsuConditionAsync()
+
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
-
-	go insertIsuConditionAsync()
 }
 
 func getSession(r *http.Request) (*sessions.Session, error) {
@@ -1235,6 +1235,13 @@ func postIsuCondition(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "bad request body")
 	}
 
+	// formatチェック
+	for _, cond := range req {
+		if !isValidConditionFormat(cond.Condition) {
+			return c.String(http.StatusBadRequest, "bad request body")
+		}
+	}
+
 	// tx, err := db.Beginx()
 	// if err != nil {
 	// 	c.Logger().Errorf("db error: %v", err)
@@ -1254,10 +1261,6 @@ func postIsuCondition(c echo.Context) error {
 
 	for _, cond := range req {
 		timestamp := time.Unix(cond.Timestamp, 0)
-
-		if !isValidConditionFormat(cond.Condition) {
-			return c.String(http.StatusBadRequest, "bad request body")
-		}
 		// chanに登録
 		insertIsuConditionChan <- &InsertIsuConditionRow{
 			JIAIsuUUID: jiaIsuUUID,
