@@ -335,12 +335,12 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	        // 追加
-        go func() {
-                if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
-                        log.Printf("failed to communicate with pprotein: %v", err)
-                }
-        }()
+	// 追加
+	go func() {
+		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
+			log.Printf("failed to communicate with pprotein: %v", err)
+		}
+	}()
 
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
@@ -1089,6 +1089,7 @@ func calculateConditionLevel(condition string) (string, error) {
 // ISUの性格毎の最新のコンディション情報
 func getTrend(c echo.Context) error {
 	characterList := []Isu{}
+	// キャラ２５個を取得
 	err := db.Select(&characterList, "SELECT `character` FROM `isu` GROUP BY `character`")
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
@@ -1099,6 +1100,7 @@ func getTrend(c echo.Context) error {
 
 	for _, character := range characterList {
 		isuList := []Isu{}
+		// キャラクター毎のISUリストを取得
 		err = db.Select(&isuList,
 			"SELECT * FROM `isu` WHERE `character` = ?",
 			character.Character,
@@ -1113,8 +1115,9 @@ func getTrend(c echo.Context) error {
 		characterCriticalIsuConditions := []*TrendCondition{}
 		for _, isu := range isuList {
 			conditions := []IsuCondition{}
+			// あるユーザのISUのコンディションを取得
 			err = db.Select(&conditions,
-				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC",
+				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC limit 1",
 				isu.JIAIsuUUID,
 			)
 			if err != nil {
