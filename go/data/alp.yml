@@ -1,0 +1,10 @@
+matching_groups:
+    - ^/api/mock/.+[0-9]$
+    - ^/api/mock/.+[a-z]$
+    - ^/api/isu/.+[0-9a-f\-]$
+    - ^/api/condition/.+[0-9a-f\-]$
+    - ^/api/isu/.+[0-9a-f\-]/graph$
+    - ^/api/isu/.+[0-9a-f\-]/icon$
+    - ^/isu/.+[0-9a-f\-]$
+    - ^/isu/.+[0-9a-f\-]/graph$
+    - ^/isu/.+[0-9a-f\-]/condition$
