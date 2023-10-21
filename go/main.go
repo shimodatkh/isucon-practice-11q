@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -258,6 +259,8 @@ func main() {
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
+
+	go insertIsuConditionAsync()
 }
 
 func getSession(r *http.Request) (*sessions.Session, error) {
@@ -1168,19 +1171,56 @@ func getTrend(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+type InsertIsuConditionRow struct {
+	JIAIsuUUID string    `db:"jia_isu_uuid"`
+	Timestamp  time.Time `db:"timestamp"`
+	IsSitting  bool      `db:"is_sitting"`
+	Condition  string    `db:"condition"`
+	Message    string    `db:"message"`
+}
+
 var (
-	conditionChan = make(chan *PostIsuConditionRequest, 1000)
+	// 一定時間ごとにISUのコンディションをDBに登録するためのチャネル
+	insertIsuConditionChan = make(chan *InsertIsuConditionRow, 1000)
 )
+
+// 非同期にDBにコンディションを登録するメソッド
+func insertIsuConditionAsync() {
+	rows := []*InsertIsuConditionRow{}
+	ticker := time.NewTicker(time.Millisecond * 100)
+
+	for {
+		select {
+		case <-ticker.C:
+			if len(rows) == 0 {
+				continue
+			}
+			// rowsをNamedExecで一括登録
+			_, err := db.NamedExec(
+				"INSERT INTO `isu_condition`"+
+					"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
+					"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :message)", rows)
+			if err != nil {
+				log.Errorf("db error: %v", err)
+			}
+			rows = []*InsertIsuConditionRow{}
+		case row := <-insertIsuConditionChan:
+			rows = append(rows, row)
+		}
+
+	}
+}
 
 // POST /api/condition/:jia_isu_uuid
 // ISUからのコンディションを受け取る
+// DBへの登録は非同期で行う
 func postIsuCondition(c echo.Context) error {
 	// TODO: 一定割合リクエストを落としてしのぐようにしたが、本来は全量さばけるようにすべき
-	// dropProbability := 0.9
-	// if rand.Float64() <= dropProbability {
-	// 	c.Logger().Warnf("drop post isu condition request")
-	// 	return c.NoContent(http.StatusAccepted)
-	// }
+	dropProbability := 0.9
+	if rand.Float64() <= dropProbability {
+		c.Logger().Warnf("drop post isu condition request")
+		return c.NoContent(http.StatusAccepted)
+	}
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 	if jiaIsuUUID == "" {
@@ -1218,15 +1258,14 @@ func postIsuCondition(c echo.Context) error {
 		if !isValidConditionFormat(cond.Condition) {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
+		// chanに登録
+		insertIsuConditionChan <- &InsertIsuConditionRow{
+			JIAIsuUUID: jiaIsuUUID,
+			Timestamp:  timestamp,
+			IsSitting:  cond.IsSitting,
 
-		_, err = tx.Exec(
-			"INSERT INTO `isu_condition`"+
-				"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
-				"	VALUES (?, ?, ?, ?, ?)",
-			jiaIsuUUID, timestamp, cond.IsSitting, cond.Condition, cond.Message)
-		if err != nil {
-			c.Logger().Errorf("db error: %v", err)
-			return c.NoContent(http.StatusInternalServerError)
+			Condition: cond.Condition,
+			Message:   cond.Message,
 		}
 
 	}
@@ -1238,6 +1277,19 @@ func postIsuCondition(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusAccepted)
+}
+
+func newFunction(err error, tx *sqlx.Tx, jiaIsuUUID string, timestamp time.Time, cond PostIsuConditionRequest, c echo.Context) (bool, error) {
+	_, err = tx.Exec(
+		"INSERT INTO `isu_condition`"+
+			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
+			"	VALUES (?, ?, ?, ?, ?)",
+		jiaIsuUUID, timestamp, cond.IsSitting, cond.Condition, cond.Message)
+	if err != nil {
+		c.Logger().Errorf("db error: %v", err)
+		return true, c.NoContent(http.StatusInternalServerError)
+	}
+	return false, nil
 }
 
 // ISUのコンディションの文字列がcsv形式になっているか検証
