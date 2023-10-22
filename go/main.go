@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -962,6 +961,7 @@ func getIsuConditions(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	// jia_isu_uuidを取得
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 	if jiaIsuUUID == "" {
 		return c.String(http.StatusBadRequest, "missing: jia_isu_uuid")
@@ -977,6 +977,8 @@ func getIsuConditions(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "missing: condition_level")
 	}
 	conditionLevel := map[string]interface{}{}
+	// condition_levelが指定されている場合は、condition_levelを,で分解してmapに変換
+	// conditionLevelCSVをmapに変換
 	for _, level := range strings.Split(conditionLevelCSV, ",") {
 		conditionLevel[level] = struct{}{}
 	}
@@ -991,6 +993,7 @@ func getIsuConditions(c echo.Context) error {
 		startTime = time.Unix(startTimeInt64, 0)
 	}
 
+	// isuの名前を取得(jia_isu_uuidだけで特定できるんじゃ？jia_user_idはユーザがあってるかのチェックってことか？)
 	var isuName string
 	err = db.Get(&isuName,
 		"SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
@@ -1020,6 +1023,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	conditions := []IsuCondition{}
 	var err error
 
+	// startTimeが指定されていない場合はendTimeからlimit件取得
 	if startTime.IsZero() {
 		err = db.Select(&conditions,
 			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
@@ -1042,11 +1046,13 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 
 	conditionsResponse := []*GetIsuConditionResponse{}
 	for _, c := range conditions {
+		// ISUのコンディションの文字列からコンディションレベルを計算
 		cLevel, err := calculateConditionLevel(c.Condition)
 		if err != nil {
 			continue
 		}
 
+		// conditionLevelにその文字列（info/warning/critical）が含まれているかチェック
 		if _, ok := conditionLevel[cLevel]; ok {
 			data := GetIsuConditionResponse{
 				JIAIsuUUID:     c.JIAIsuUUID,
@@ -1061,6 +1067,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 		}
 	}
 
+	// limit=20、20件以上ある場合は20件にする
 	if len(conditionsResponse) > limit {
 		conditionsResponse = conditionsResponse[:limit]
 	}
@@ -1216,11 +1223,11 @@ func insertIsuConditionAsync() {
 // DBへの登録は非同期で行う
 func postIsuCondition(c echo.Context) error {
 	// TODO: 一定割合リクエストを落としてしのぐようにしたが、本来は全量さばけるようにすべき
-	dropProbability := 0.9
-	if rand.Float64() <= dropProbability {
-		c.Logger().Warnf("drop post isu condition request")
-		return c.NoContent(http.StatusAccepted)
-	}
+	// dropProbability := 0.9
+	// if rand.Float64() <= dropProbability {
+	// 	c.Logger().Warnf("drop post isu condition request")
+	// 	return c.NoContent(http.StatusAccepted)
+	// }
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 	if jiaIsuUUID == "" {
