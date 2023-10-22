@@ -1194,7 +1194,7 @@ var (
 // 非同期にDBにコンディションを登録するメソッド
 func insertIsuConditionAsync() {
 	rows := []*InsertIsuConditionRow{}
-	ticker := time.NewTicker(time.Millisecond * 10)
+	ticker := time.NewTicker(time.Millisecond * 100)
 
 	for {
 		select {
