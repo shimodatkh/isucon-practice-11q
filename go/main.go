@@ -338,7 +338,7 @@ func postInitialize(c echo.Context) error {
 
 	// 追加
 	go func() {
-		if _, err := http.Get("http://localhost:9000/api/group/collect"); err != nil {
+		if _, err := http.Get("http://18.180.6.77:9000/api/group/collect"); err != nil {
 			log.Printf("failed to communicate with pprotein: %v", err)
 		}
 	}()
@@ -1287,19 +1287,6 @@ func postIsuCondition(c echo.Context) error {
 	// }
 
 	return c.NoContent(http.StatusAccepted)
-}
-
-func newFunction(err error, tx *sqlx.Tx, jiaIsuUUID string, timestamp time.Time, cond PostIsuConditionRequest, c echo.Context) (bool, error) {
-	_, err = tx.Exec(
-		"INSERT INTO `isu_condition`"+
-			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
-			"	VALUES (?, ?, ?, ?, ?)",
-		jiaIsuUUID, timestamp, cond.IsSitting, cond.Condition, cond.Message)
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return true, c.NoContent(http.StatusInternalServerError)
-	}
-	return false, nil
 }
 
 // ISUのコンディションの文字列がcsv形式になっているか検証
