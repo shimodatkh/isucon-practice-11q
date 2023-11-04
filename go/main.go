@@ -82,13 +82,17 @@ type GetIsuListResponse struct {
 }
 
 type IsuCondition struct {
-	ID         int       `db:"id"`
-	JIAIsuUUID string    `db:"jia_isu_uuid"`
-	Timestamp  time.Time `db:"timestamp"`
-	IsSitting  bool      `db:"is_sitting"`
-	Condition  string    `db:"condition"`
-	Message    string    `db:"message"`
-	CreatedAt  time.Time `db:"created_at"`
+	ID           int       `db:"id"`
+	JIAIsuUUID   string    `db:"jia_isu_uuid"`
+	Timestamp    time.Time `db:"timestamp"`
+	IsSitting    bool      `db:"is_sitting"`
+	Condition    string    `db:"condition"`
+	Message      string    `db:"message"`
+	CreatedAt    time.Time `db:"created_at"`
+	IsDirty      int       `db:"is_dirty"`
+	IsOverweight int       `db:"is_overweight"`
+	IsBroken     int       `db:"is_broken"`
+	CondScore    int       `db:"cond_score"`
 }
 
 type MySQLConnectionEnv struct {
