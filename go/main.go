@@ -1029,21 +1029,39 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	conditions := []IsuCondition{}
 	var err error
 
+	// conditionLevelのmapを数値の配列に変換
+	conditionLevelArray := []int{}
+	for level := range conditionLevel {
+		// conditionLevelがinfo/warning/criticalに応じて数値を設定
+		switch level {
+		case conditionLevelInfo:
+			conditionLevelArray = append(conditionLevelArray, 0)
+		case conditionLevelWarning:
+			conditionLevelArray = append(conditionLevelArray, 1)
+			conditionLevelArray = append(conditionLevelArray, 2)
+		case conditionLevelCritical:
+			conditionLevelArray = append(conditionLevelArray, 3)
+		}
+	}
+
 	// startTimeが指定されていない場合はendTimeからlimit件取得
+	// conditionLevelArrayが指定されている場合はcond_scoreをそれで絞る
 	if startTime.IsZero() {
 		err = db.Select(&conditions,
 			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
+				"   AND `cond_score` IN (?)"+
 				"	ORDER BY `timestamp` DESC limit 20",
-			jiaIsuUUID, endTime,
+			jiaIsuUUID, endTime, conditionLevelArray,
 		)
 	} else {
 		err = db.Select(&conditions,
 			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"	AND ? <= `timestamp`"+
+				"   AND `cond_score` IN (?)"+
 				"	ORDER BY `timestamp` DESC limit 20",
-			jiaIsuUUID, endTime, startTime,
+			jiaIsuUUID, endTime, startTime, conditionLevelArray,
 		)
 	}
 	if err != nil {
@@ -1235,8 +1253,8 @@ func insertIsuConditionAsync() {
 							row.IsBroken = 1
 						}
 					}
-					row.CondScore = badConditionsCount
 				}
+				row.CondScore = badConditionsCount
 			}
 
 			// rowsをNamedExecで一括登録
