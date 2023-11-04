@@ -262,7 +262,7 @@ func main() {
 
 	go insertIsuConditionAsync()
 
-	log.Infof("log kakunin")
+	// log.Infof("log kakunin")
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
@@ -345,12 +345,12 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// 追加
-	go func() {
-		if _, err := http.Get("http://18.180.6.77:9000/api/group/collect"); err != nil {
-			log.Printf("failed to communicate with pprotein: %v", err)
-		}
-	}()
+	// // 追加
+	// go func() {
+	// 	if _, err := http.Get("http://18.180.6.77:9000/api/group/collect"); err != nil {
+	// 		log.Printf("failed to communicate with pprotein: %v", err)
+	// 	}
+	// }()
 
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
