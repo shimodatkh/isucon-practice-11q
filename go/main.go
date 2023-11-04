@@ -258,6 +258,8 @@ func main() {
 
 	go insertIsuConditionAsync()
 
+	log.Infof("log kakunin")
+
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
 }
