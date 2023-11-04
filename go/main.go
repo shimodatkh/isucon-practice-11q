@@ -1188,11 +1188,15 @@ func getTrend(c echo.Context) error {
 }
 
 type InsertIsuConditionRow struct {
-	JIAIsuUUID string    `db:"jia_isu_uuid"`
-	Timestamp  time.Time `db:"timestamp"`
-	IsSitting  bool      `db:"is_sitting"`
-	Condition  string    `db:"condition"`
-	Message    string    `db:"message"`
+	JIAIsuUUID   string    `db:"jia_isu_uuid"`
+	Timestamp    time.Time `db:"timestamp"`
+	IsSitting    bool      `db:"is_sitting"`
+	Condition    string    `db:"condition"`
+	Message      string    `db:"message"`
+	IsDirty      int       `db:"is_dirty"`
+	IsOverweight int       `db:"is_overweight"`
+	IsBroken     int       `db:"is_broken"`
+	CondScore    int       `db:"cond_score"`
 }
 
 var (
@@ -1211,11 +1215,35 @@ func insertIsuConditionAsync() {
 			if len(rows) == 0 {
 				continue
 			}
+			// rowsのconditionをパースして、is_dirty, is_overweight, is_broken, cond_scoreを計算
+			for _, row := range rows {
+				badConditionsCount := 0
+				// ISUのコンディションの文字列から各種コンディションの値を取得
+				for _, condStr := range strings.Split(row.Condition, ",") {
+					keyValue := strings.Split(condStr, "=")
+
+					conditionName := keyValue[0]
+					if keyValue[1] == "true" {
+						badConditionsCount++
+						// conditionNameに応じて対応するカラムの値を1にする
+						switch conditionName {
+						case "is_dirty":
+							row.IsDirty = 1
+						case "is_overweight":
+							row.IsOverweight = 1
+						case "is_broken":
+							row.IsBroken = 1
+						}
+					}
+					row.CondScore = badConditionsCount
+				}
+			}
+
 			// rowsをNamedExecで一括登録
 			_, err := db.NamedExec(
 				"INSERT INTO `isu_condition`"+
-					"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`)"+
-					"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :message)", rows)
+					"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `message`, `is_dirty`, `is_overweight`, `is_broken`, `cond_score`)"+
+					"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :message, :is_dirty, :is_overweight, :is_broken, :cond_score)", rows)
 			if err != nil {
 				log.Errorf("db error: %v", err)
 			}
