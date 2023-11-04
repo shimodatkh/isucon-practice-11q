@@ -1088,6 +1088,9 @@ func calculateConditionLevel(condition string) (string, error) {
 	case 3:
 		conditionLevel = conditionLevelCritical
 	default:
+		// エラーログを出す
+		log.Warnf("calculateConditionLevel error: %s", condition)
+
 		return "", fmt.Errorf("unexpected warn count")
 	}
 
