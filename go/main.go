@@ -801,7 +801,11 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 	var startTimeInThisHour time.Time
 	var condition IsuCondition
 
-	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` ASC", jiaIsuUUID)
+	// timeを使ってSQLのwhereに指定し、対象を１日分に絞る
+	endOfDay := graphDate.Add(24 * time.Hour)
+	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? AND `timestamp` >= ? AND `timestamp` < ? ORDER BY `timestamp` ASC", jiaIsuUUID, graphDate, endOfDay)
+
+	// rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` ASC", jiaIsuUUID)
 	if err != nil {
 		return nil, fmt.Errorf("db error: %v", err)
 	}
@@ -812,6 +816,8 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 			return nil, err
 		}
 
+		// Truncate は、(ゼロ時間以降) t を d の倍数に切り捨てた結果を返します。 d <= 0 の場合、Truncate は単調クロック読み取り値を取り除いた t を返しますが、それ以外の場合は変更されません。
+		// Truncate は、ゼロ時刻からの絶対期間として時間を操作します。 当時のプレゼンテーション形式では機能しません。 したがって、Truncate(Hour) は、時刻の場所に応じて、ゼロ以外の分を含む時刻を返す場合があります。\
 		truncatedConditionTime := condition.Timestamp.Truncate(time.Hour)
 		if truncatedConditionTime != startTimeInThisHour {
 			if len(conditionsInThisHour) > 0 {
