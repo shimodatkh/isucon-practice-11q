@@ -1047,22 +1047,41 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	// startTimeが指定されていない場合はendTimeからlimit件取得
 	// conditionLevelArrayが指定されている場合はcond_scoreをそれで絞る
 	if startTime.IsZero() {
-		err = db.Select(&conditions,
-			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
-				"	AND `timestamp` < ?"+
-				"   AND `cond_score` IN (?)"+
-				"	ORDER BY `timestamp` DESC limit 20",
-			jiaIsuUUID, endTime, conditionLevelArray,
-		)
+		// err = db.Select(&conditions,
+		// 	"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
+		// 		"	AND `timestamp` < ?"+
+		// 		"   AND `cond_score` IN (?)"+
+		// 		"	ORDER BY `timestamp` DESC limit 20",
+		// 	jiaIsuUUID, endTime, conditionLevelArray,
+		// )
+
+		sql := `SELECT * FROM isu_condition WHERE jia_isu_uuid = ? AND timestamp < ? AND cond_score IN (?) ORDER BY timestamp DESC LIMIT 20`
+		query, args, err := sqlx.In(sql, jiaIsuUUID, endTime, conditionLevelArray)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// MySQL用にクエリをリバインド
+		query = db.Rebind(query)
+
+		// クエリの実行
+		err = db.Select(&conditions, query, args...)
+
 	} else {
-		err = db.Select(&conditions,
-			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
-				"	AND `timestamp` < ?"+
-				"	AND ? <= `timestamp`"+
-				"   AND `cond_score` IN (?)"+
-				"	ORDER BY `timestamp` DESC limit 20",
-			jiaIsuUUID, endTime, startTime, conditionLevelArray,
-		)
+		sql := `SELECT * FROM isu_condition WHERE jia_isu_uuid = ? AND timestamp < ? AND ? <= timestamp AND cond_score IN (?) ORDER BY timestamp DESC LIMIT 20`
+		query, args, err := sqlx.In(sql, jiaIsuUUID, endTime, startTime, conditionLevelArray)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// MySQL用にクエリをリバインド
+		query = db.Rebind(query)
+
+		// クエリの実行
+		err = db.Select(&conditions, query, args...)
+
 	}
 	if err != nil {
 		return nil, fmt.Errorf("db error: %v", err)
